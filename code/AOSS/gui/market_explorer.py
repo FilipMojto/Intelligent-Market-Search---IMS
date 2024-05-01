@@ -83,8 +83,8 @@ class Table(Frame):
 class ExplorationTable(Frame):
 
     ROW_COUNT = 4
-    COLUMN_NAMES_EN = ('Total Price', 'Product Availability', 'Recommended')
-    COLUMN_NAMES_SK = ('Celková cena', 'Dostupnosť produktu', 'Odporúčanie')
+    COLUMN_NAMES_EN = ('Total Price', 'Total Availability (%)', 'Recommended')
+    COLUMN_NAMES_SK = ('Celková cena', 'Celková dostupnosť (%)', 'Odporúčanie')
 
     def __init__(self, *args, market_hub: MarketPlace, language: Literal['EN', 'SK'] = 'EN', **kw):
         super(ExplorationTable, self).__init__(*args, **kw)
@@ -265,7 +265,7 @@ class MarketExplorerFrame(LabelFrame):
         self.shopping_list = shopping_list_frame
         self.market_hub = market_hub
         self.markets = market_hub.markets()
-        self.market_explorer = MarketExplorer(market_hub=market_hub, alternatives=5)
+        self.market_explorer = MarketExplorer(market_place=market_hub, alternatives=5)
 
         self.product_items = shopping_list_frame.product_list.items
         # self.product_items: List[ShoppingListItem] = []
@@ -318,6 +318,9 @@ class MarketExplorerFrame(LabelFrame):
         self.explorer_view.detailed_results_table.insert_value(row=0, column=2, value=self.cur_product_details_cols_names[2])
 
         self.search_executed: bool = False
+        self.next_target_ID: int = 1
+    
+
     
     def delete_product(self, item = None):
 
@@ -373,7 +376,7 @@ class MarketExplorerFrame(LabelFrame):
 
 
 
-    def show_product_details(self, event, item: ShoppingListItem, index: int):
+    def show_product_details(self, event, item: ShoppingListItem, target_ID: int):
         item.on_item_clicked(event=event)
         
 
@@ -401,25 +404,37 @@ class MarketExplorerFrame(LabelFrame):
 
             markets.append(self.explorations[i][0].market_ID)
             
-            try:
-                prices[i].append(self.explorations[i][0].product_data[0][1].price)
-            except IndexError:
-                # No products found in the first exploration
-                prices[i].append("---")
+            # try:
+            #     prices[i].append(self.explorations[i][0].product_data[0][1].price)
+            # except IndexError:
+            #     # No products found in the first exploration
+            #     prices[i].append("---")
                 
 
             for g in range(alternative_limit):
                 expl = self.explorations[i][g]
                 
-                try:
-                    self.product_price_mappings[i][expl.product_data[index][1].name] = expl.product_data[index][1].price
+                prod_data = None
 
-                    product_explorations[i].append(expl.product_data[index][1].name)
-                    prices[i].append(expl.product_data[index][1].price)
-                except IndexError:
-              
+                for data in expl.product_data:
+                    if data[0] == target_ID + 1:
+                        prod_data = data
+
+
+                try:
+                    self.product_price_mappings[i][prod_data[1].name] = prod_data[1].price
+
+                    product_explorations[i].append(prod_data[1].name)
+                    prices[i].append(prod_data[1].price)
+                except (IndexError, AttributeError):
+                    product_explorations[i].append("---")
+                    prices[i].append("---")
                     # no products were found
                     pass
+                # except TypeError:
+                #     product_explorations[i].append("---")
+                #     prices[i].append("---")
+                #     #
         
 
             # for g in range(i * 5, (i * 5) + 5):
@@ -455,7 +470,7 @@ class MarketExplorerFrame(LabelFrame):
                 pass
   
             
-            box.bind('<<ComboboxSelected>>', lambda event, box=box: self.combobox_selected(event, box=box, index=index))
+            box.bind('<<ComboboxSelected>>', lambda event, box=box: self.combobox_selected(event, box=box, index=target_ID))
    
             combo_boxes.append(box)
 
@@ -502,7 +517,7 @@ class MarketExplorerFrame(LabelFrame):
 
 
     def create_handler(self, item, index):
-        return lambda event: self.show_product_details(event=event, index=index, item=item)    
+        return lambda event: self.show_product_details(event=event, target_ID=index, item=item)    
 
 
     def refresh_recommendation(self, _ = None):
@@ -577,13 +592,37 @@ class MarketExplorerFrame(LabelFrame):
         
         self.market_explorer.explore(product_list=item_data)
 
+    def is_bound(self, widget, event):
+        """
+        Check if a widget is bound to a certain event.
+        """
 
+        bindtags = widget.bindtags()
+
+        for tag in bindtags:
+            bind_info = widget.bind_class(tag, None)
+
+            if event in bind_info:
+                return True
+
+        return False
+
+    def is_bound_2(self, widget):
+        existing_bindings = widget.bind("<Button-1>")
+        if existing_bindings and str(existing_bindings) == str(widget.bind(on_button_click)):
+            print("Event is already bound to the function")
+        else:
+            # Bind the event to the function
+            root.bind("<Button-1>", on_button_click)
+            print("Event bound to the function")
 
     def search_markets(self):
         self.search_executed = True
         
-        for i, item in enumerate(self.product_items):
-            bind_widgets_recursive(widget=item, event="<Button-1>", handler=self.create_handler(index=i, item=item))
+        for item in self.product_items:
+            if not self.is_bound(widget=item, event='<Button-1>'):
+                bind_widgets_recursive(widget=item, event="<Button-1>", handler=self.create_handler(index=self.next_target_ID, item=item))
+                self.next_target_ID += 1
 
 
         self.explorations = self.market_explorer.get_explorations()
@@ -595,7 +634,7 @@ class MarketExplorerFrame(LabelFrame):
 
             self.explorer_view.table.insert_value(row=0, col=expl.market_ID, value=self.market_hub.market(identifier=expl.market_ID).name().lower())
             self.explorer_view.table.insert_value(row=1, col=expl.market_ID, value= round(expl.total_price, 2))
-            self.explorer_view.table.insert_value(row=2, col=expl.market_ID, value=round(expl.availability_rate, 2))
+            self.explorer_view.table.insert_value(row=2, col=expl.market_ID, value=int(round(expl.availability_rate, 0)))
             
 
             

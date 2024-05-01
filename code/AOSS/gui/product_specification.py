@@ -581,7 +581,7 @@ class CategoryButtonsPanel(LabelFrame):
         self.__baked_products = Radiobutton(self, bg=self._BACKGROUND, state=self.state, activebackground='grey', text="2 - Pečivo", font=self.FONT, width=self.TEXT_WIDTH, variable=self.__variable, value=2, anchor='w')
         self.__baked_products.grid(row=1, column=0, sticky="W")
 
-        self.__meat_and_frost = Radiobutton(self, bg=self._BACKGROUND, state=self.state, activebackground='grey', text="3 - Mäso a mrazené potraviny", font=self.FONT, width=self.TEXT_WIDTH, variable=self.__variable, value=3, anchor='w')
+        self.__meat_and_frost = Radiobutton(self, bg=self._BACKGROUND, state=self.state, activebackground='grey', text="3 - Mäso a mrazené výrobky", font=self.FONT, width=self.TEXT_WIDTH, variable=self.__variable, value=3, anchor='w')
         self.__meat_and_frost.grid(row=1, column=1, sticky="W")
 
         self.__smoked_paste = Radiobutton(self, bg=self._BACKGROUND, state=self.state,  activebackground='grey', text="4 - Udeniny, natierky a pastety", font=self.FONT, width=self.TEXT_WIDTH, variable=self.__variable, value=4, anchor='w')

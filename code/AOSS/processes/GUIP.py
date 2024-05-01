@@ -145,7 +145,7 @@ def start(main_to_all: mpr.Queue = None, gui_to_main: mpr.Queue = None, hub_to_g
         with lock:
             # end = time.time()
             # print(f"time: {end - start}")
-            app.market_hub.load_dataset()
+            app.market_place.load_dataset()
         
         while gui_to_hub.full():
             

@@ -196,11 +196,12 @@ class MarketExplorer:
             
             self.product_data.append((target_ID, product, match_ratio, quantity))
             
-            self.total_price += product.price
-            self.total_expected_quantity += quantity
-            self.total_remaining_quantity += (product.quantity_left if product.quantity_left <= quantity else quantity)
-            self.availability_rate = (self.total_remaining_quantity/self.total_expected_quantity) * 100
-            self.general_metric = self.availability_rate / self.total_price
+            if product is not None:
+                self.total_price += product.price
+                self.total_expected_quantity += quantity
+                self.total_remaining_quantity += (product.quantity_left if product.quantity_left <= quantity else quantity)
+                self.availability_rate = (self.total_remaining_quantity/self.total_expected_quantity) * 100
+                self.general_metric = self.availability_rate / self.total_price
       
 
         def replace_product(self, replacement: tuple[int, RegisteredProduct, float, int]):
@@ -228,11 +229,11 @@ class MarketExplorer:
     """
 
     
-    def __init__(self, market_hub: MarketPlace, alternatives: int = 1) -> None:
-        self.__market_hub = market_hub
-        self.__matcher = ProductMatcher(market_hub=self.__market_hub)
+    def __init__(self, market_place: MarketPlace, alternatives: int = 1) -> None:
+        self.__market_place = market_place
+        self.__matcher = ProductMatcher(market_place=self.__market_place)
      
-        self.__markets = self.__market_hub.markets()
+        self.__markets = self.__market_place.markets()
         self.__explorations: List[List[MarketExplorer.Exploration]] = []
         self.__alternatives = alternatives
 
@@ -351,7 +352,7 @@ class MarketExplorer:
             2) limit - specifies how many additional explorations will be executed
         """
 
-        for index, market in enumerate(self.__markets):
+        for market_index, market in enumerate(self.__markets):
 
             for params in product_list:
 
@@ -367,12 +368,20 @@ class MarketExplorer:
 
                 for i in range(alternative_count):
 
-                    expl = self.__explorations[index][i]
+                    expl = self.__explorations[market_index][i]
                     product=market.get_product(identifier=match_record[i].product_ID)
                     expl.insert_product(target_ID=params.target_id,
                                         product=product,
                                         match_ratio=match_record[i].ratio,
                                         quantity=params.required_quantity)
+                    
+                if alternative_count == 0:
+                    # no products were found
+                    self.__explorations[market_index][0].insert_product(target_ID=params.target_id,
+                                        product=None,
+                                        match_ratio=-1,
+                                        quantity=params.required_quantity)
+                    
             
     # def explore(self, product_list: List[ tuple[int, str, ProductCategory, int]]):
     #     """

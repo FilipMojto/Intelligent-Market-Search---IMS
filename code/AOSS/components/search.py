@@ -164,16 +164,16 @@ class ProductMatcher:
 
 
 
-    def __init__(self, market_hub: MarketPlace) -> None:
+    def __init__(self, market_place: MarketPlace) -> None:
         
-        self.__market_hub = market_hub
-        self.__markets = self.__market_hub.markets()
+        self.__market_place = market_place
+        self.__markets = self.__market_place.markets()
         
         if len(self.__markets) == 0:
             raise ValueError("Provided market hub contains no markets!")
 
         #market_hub.load_products()
-        self.__product_df = market_hub.product_df()
+        self.__product_df = market_place.product_df()
         self.__subset = None
 
         for market in self.__markets:
@@ -201,12 +201,12 @@ class ProductMatcher:
         self.__subset = self.__product_df.filter(self.__product_df['market_ID'] == market_ID)
 
     # Define a function to apply your mapping logic
-    def filter_category(self, row, category: ProductCategory):
-    
-        mapped_category = get_mapped_category(query_string_ID=row,
-                                            mappings_file=CATEGORY_MAP_FILE['path'],
-                                            categories_file=CATEGORY_FILE['path'])
-        return mapped_category == category.name
+    def filter_category(self, row, category: str):
+        standardized_category = self.__market_place.get_standardized_category(category_ID=row)
+        # mapped_category = get_mapped_category(query_string_ID=row,
+        #                                     mappings_file=CATEGORY_MAP_FILE['path'],
+        #                                     categories_file=CATEGORY_FILE['path'])
+        return standardized_category == category
 
     def match(self, text: str, markets: tuple[int] = None, category: ProductCategory = None, categorization: Literal['ManualMapping', 'TM-based Mapping' ] = 'ManualMapping', limit: int = 10,
               min_match: float = 0, for_each: bool = False, sort_words: bool = False, use_subset: bool = False,
@@ -274,8 +274,10 @@ class ProductMatcher:
 
         # filtering products by their category
         if category is not None:
+            category_name = category.name.lower()
+
             if categorization == 'ManualMapping':
-                df = df.filter(polars.col("query_string_ID").apply(lambda row: self.filter_category(row, category=category)))
+                df = df.filter(polars.col("query_string_ID").apply(lambda row: self.filter_category(row, category=category_name)))
                 
                 # df = df.filter(get_mapped_category(query_string_ID=df['query_string_ID'],
                 #                                    mappings_file=CATEGORY_MAP_FILE['path'],
@@ -317,7 +319,7 @@ class ProductMatcher:
             
             if markets is not None and markets:
                 for market_i in markets:
-                    _markets.append(self.__market_hub.market(identifier=market_i))
+                    _markets.append(self.__market_place.market(identifier=market_i))
             else:
                 _markets = self.__markets
 

@@ -599,6 +599,8 @@ class MarketPlace(ProductIdentification):
                 self.__market_file = metadata['market_file']
 
             self.__training_market = int(metadata['training_market'])
+            if PathManager.check_if_exists(metadata['category_file']):
+                self.__standardized_category_file = metadata['category_file']
 
 
         self.__product_file: str = None
@@ -612,6 +614,8 @@ class MarketPlace(ProductIdentification):
         # when market stats are saved back to the file, their IDs are based on
         # this mapping
         self.__markets: List[tuple[Market, int]] = []
+        self.__mappings: Dict[int, str] = {}
+
         
 
 
@@ -623,8 +627,8 @@ class MarketPlace(ProductIdentification):
         if (console_log is not None and console_log) or self.console_log:
             print("Loading markets from a file...")
   
-
         self.load_markets()
+        self.load_mappings()        
         self.load_products()
         
         if (console_log is not None and console_log) or self.console_log:
@@ -648,7 +652,7 @@ class MarketPlace(ProductIdentification):
             in the buffer. When loading metadata, their format is strictly checked. If certain line
             in the file contain invalid data, it might be skipped completely or logged.
 
-            Paramters:
+            Parameters:
 
                 console_log - if any errors with Market metadata are encountered, they are logged in
                                        theconsole  
@@ -716,6 +720,43 @@ class MarketPlace(ProductIdentification):
             
             # eventually sets the training market
             self.__training_market = self.market(identifier=self.__training_market)
+
+    def get_standardized_category(self, category_ID: int):
+        return self.__mappings[category_ID] if category_ID in self.__mappings else None
+    
+
+    def load_mappings(self):
+        """
+            Loads mappings of each market's local category to a standardized category.
+
+            Markets' metadata must be loaded first in order to get the path of their 
+            local categories. This can be done calling load_markets() method.
+        """
+
+        category_mappings = []
+        normalized_categories = []
+
+        with open(file=self.__category_file, mode='r', encoding='utf-8') as category_file:
+            mapping_reader = csv.reader(category_file)
+            next(mapping_reader)
+            category_mappings = list(mapping_reader)
+   
+
+        with open(file=self.__standardized_category_file, mode='r', encoding='utf-8') as stnd_category_file:
+            stnd_category_reader = csv.reader(stnd_category_file)
+            next(stnd_category_reader)
+            normalized_categories = list(stnd_category_reader)
+        
+        for CM_row in category_mappings:
+            
+            for NC_row in normalized_categories:
+
+                if CM_row[CATEGORY_MAP_FILE['columns']['category_ID']['index']] == NC_row[CATEGORY_FILE['columns']['ID']['index']]:
+                    self.__mappings[int(CM_row[CATEGORY_MAP_FILE['columns']['ID']['index']])] = NC_row[CATEGORY_FILE['columns']['name']['index']] 
+                    break
+
+
+
 
 
 

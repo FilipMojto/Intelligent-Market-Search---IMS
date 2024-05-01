@@ -169,7 +169,12 @@
                     "training_market": {
                         "index": 3,
                         "type": "integer"
-                    }   
+                    },
+                    
+                    "category_file": {
+                        "index": 4,
+                        "type": "string"
+                    }
                 }
             },
 

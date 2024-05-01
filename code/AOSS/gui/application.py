@@ -55,14 +55,16 @@ class Application(tkinter.Tk):
 
         
 
-        self.market_hub = MarketPlace(src_file=MARKET_CENTER_FILE['path'])
-        self.market_hub.load_markets()
+        self.market_place = MarketPlace(src_file=MARKET_CENTER_FILE['path'])
+        self.market_place.load_markets()
+        self.market_place.load_mappings()
+        
 
         if lock:
             with lock:
-                self.market_hub.load_products()
+                self.market_place.load_products()
         else:
-            self.market_hub.load_products()
+            self.market_place.load_products()
 
         self.title(self.NAME + " Application " + __VERSION__)
         self.geometry("+50+50") 
@@ -73,7 +75,7 @@ class Application(tkinter.Tk):
         
         self.main_view = MainWindow(self, root=self, app_name=self.NAME, app_version=__VERSION__, is_beta=self.BETA,
                                     language=language,
-                                    market_hub=self.market_hub, gui_to_hub=gui_to_hub, bg='lightblue',
+                                    market_hub=self.market_place, gui_to_hub=gui_to_hub, bg='lightblue',
                                     main_menu_items=self.cur_main_menu_items)
         self.main_view.pack(side='left', fill='both', expand=True, padx=10)
 

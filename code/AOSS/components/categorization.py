@@ -165,7 +165,7 @@ class ProductCategorizer:
         
         self.__market_hub = market_hub
         self.__training_market = self.__market_hub.training_market()
-        self.__matcher = ProductMatcher(market_hub=self.__market_hub)
+        self.__matcher = ProductMatcher(market_place=self.__market_hub)
         self.__matcher.set_subset(market_ID=self.__training_market.ID())
 
 
