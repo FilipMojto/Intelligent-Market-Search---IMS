@@ -37,7 +37,7 @@ def signal_handler(signum, frame):
 
 
 def start(main_to_all: mpr.Queue = None, gui_to_main: mpr.Queue = None, hub_to_gui: mpr.Queue = None, gui_to_hub: mpr.Queue = None, 
-          product_file_lock: mpr.Lock = None):
+          product_file_lock: mpr.Lock = None, console_log: bool = True):
     
     """
         This function starts a GUI process for AOSS app.
@@ -136,18 +136,21 @@ def start(main_to_all: mpr.Queue = None, gui_to_main: mpr.Queue = None, hub_to_g
         except KeyboardInterrupt:
             terminate()
 
-    def update(app: Application, gui_to_hub: mpr.Queue, lock: mpr.Lock):
-        
-        start = time.time()
+    def update(app: Application, gui_to_hub: mpr.Queue, lock: mpr.Lock, console_log: bool = True):
+        """
+            This function is executed whenever DPM process demands GUIP to update its product dataset.
+        """
+        # start = time.time()
 
         with lock:
-            end = time.time()
-            print(f"time: {end - start}")
+            # end = time.time()
+            # print(f"time: {end - start}")
             app.market_hub.load_dataset()
         
         while gui_to_hub.full():
-
-            print("Hub's queue full! Retrying...")
+            
+            if console_log:
+                print("Hub's queue full! Retrying...")
             time.sleep(1)
         
         gui_to_hub.put(obj=(UPDATE_PRODUCTS_SIGNAL, 1))
@@ -159,7 +162,14 @@ def start(main_to_all: mpr.Queue = None, gui_to_main: mpr.Queue = None, hub_to_g
         
 
     
-    def check_update_signal(app: Application, lock: mpr.Lock, hub_to_gui: mpr.Queue, gui_to_hub: mpr.Queue, repeat_after: int):
+    def check_update_signal(app: Application, lock: mpr.Lock, hub_to_gui: mpr.Queue, gui_to_hub: mpr.Queue, repeat_after: int,
+                            console_log: bool = True):
+        """
+            This function checks in loop whether update signal sent by DPMP was not received. In such a case
+            a new thread is launched (provided that there is no other thread running, in that case it waits)
+            to update the dataset.
+        """
+        
         nonlocal update_thread
 
         if not hub_to_gui.empty() and hub_to_gui.get(block=False)[0] == UPDATE_PRODUCTS_SIGNAL:
@@ -168,12 +178,12 @@ def start(main_to_all: mpr.Queue = None, gui_to_main: mpr.Queue = None, hub_to_g
                 update_thread.join()
 
             
-            update_thread = threading.Thread(target=update, args=(app, gui_to_hub, lock))
+            update_thread = threading.Thread(target=update, args=(app, gui_to_hub, lock, console_log))
             update_thread.start()
 
 
 
-        app.after(repeat_after, check_update_signal, app, lock, hub_to_gui, gui_to_hub, repeat_after)
+        app.after(repeat_after, check_update_signal, app, lock, hub_to_gui, gui_to_hub, repeat_after, console_log)
 
 
     def set_update_interval(sec: int):
@@ -197,13 +207,13 @@ def start(main_to_all: mpr.Queue = None, gui_to_main: mpr.Queue = None, hub_to_g
     loading_screen.destroy()
 
 
-
-    print("starting gui...")
+    if console_log:
+        print("starting gui...")
     #global app
     app = Application(lock=product_file_lock, gui_to_hub=gui_to_hub)
     app.after(1500, check_main, app, 1500)
     time.sleep(1)
-    app.after(1500, check_update_signal, app, product_file_lock, hub_to_gui, gui_to_hub, 1500)
+    app.after(1500, check_update_signal, app, product_file_lock, hub_to_gui, gui_to_hub, 1500, console_log)
 
     try:
         app.mainloop()

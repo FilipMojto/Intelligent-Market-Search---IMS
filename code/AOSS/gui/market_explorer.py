@@ -4,13 +4,14 @@ from tkinter import messagebox
 
 import threading
 from typing import List, Dict, Literal
+
 #import math
 
 import config_paths as cfg
 
 from AOSS.gui.shopping_list import ShoppingListFrame, ShoppingListItem
 from AOSS.gui.utils import CircularProgress
-from AOSS.structure.shopping import MarketHub, ProductCategory
+from AOSS.structure.shopping import MarketPlace, ProductCategory
 from AOSS.components.marexp import MarketExplorer
 from AOSS.other.utils import TextEditor
 
@@ -82,10 +83,10 @@ class Table(Frame):
 class ExplorationTable(Frame):
 
     ROW_COUNT = 4
-    COLUMN_NAMES_EN = ('Total Price', 'Availability Rate', 'Recommended')
-    COLUMN_NAMES_SK = ('Celková cena', 'Miera dostupnosti', 'Odporúčanie')
+    COLUMN_NAMES_EN = ('Total Price', 'Product Availability', 'Recommended')
+    COLUMN_NAMES_SK = ('Celková cena', 'Dostupnosť produktu', 'Odporúčanie')
 
-    def __init__(self, *args, market_hub: MarketHub, language: Literal['EN', 'SK'] = 'EN', **kw):
+    def __init__(self, *args, market_hub: MarketPlace, language: Literal['EN', 'SK'] = 'EN', **kw):
         super(ExplorationTable, self).__init__(*args, **kw)
         
         self.language = language
@@ -169,12 +170,13 @@ class ExplorerView(Frame):
     EXPL_TABLE_ORDERING_LABEL_EN = 'Evaluate by: '
     EXPL_TABLE_ORDERING_LABEL_SK = 'Vyhodnoť podľa: '
     
-    EXPL_TABLE_ORDERING_OPTIONS_EN = ('Price', 'Availability Rate')
-    EXPL_TABLE_ORDERING_OPTIONS_SK = ('Ceny', 'Miery dostupnosti')
+    EXPL_TABLE_ORDERING_OPTIONS_EN = ('Price&Availability', 'Price', 'Availability Rate')
+    EXPL_TABLE_ORDERING_OPTIONS_SK = ('Ceny a dostupnosti', 'Ceny', 'Miery dostupnosti')
     PRODUCT_DETAIL_TITLE_EN = 'Product Details'
     PRODUCT_DETAIL_TITLE_SK = 'Detaily o produkte'
 
-    def __init__(self, *args, market_hub: MarketHub, language: Literal['EN', 'SK'] = 'EN', **kw):
+    def __init__(self, *args, market_hub: MarketPlace, language: Literal['EN', 'SK'] = 'EN',
+                  **kw):
 
         super(ExplorerView, self).__init__(*args, **kw)
         self.language = language
@@ -204,6 +206,7 @@ class ExplorerView(Frame):
         self.expl_table_ordering_options['values'] = self.cur_expl_table_ordering_options
         self.expl_table_ordering_options.current(0)
         self.expl_table_ordering_options.pack(side='right', ipady=10, padx=5, pady=(5, 4))
+        
 
         self.expl_table_ordering_options_label = Label(self.expl_table_control_panel, background=self.BACKGROUND, text=self.cur_expl_table_ordering_label, font=self.FONT)
         self.expl_table_ordering_options_label.pack(side='right', pady=(5, 2))
@@ -230,6 +233,9 @@ class ExplorerView(Frame):
 
         self.detailed_results_padding = Frame(self.detailed_results, bg=BACKGROUND)
         self.detailed_results_padding.grid(row=1, column=0, sticky="NSEW")
+    
+    def bind_options(self, ordering_options_selected):
+        self.expl_table_ordering_options.bind("<<ComboboxSelected>>", ordering_options_selected)
 
     
 
@@ -241,7 +247,7 @@ class MarketExplorerFrame(LabelFrame):
     PRODUCT_DETAILS_COLS_NAMES_EN = ('Market', 'Product', 'Price')
     PRODUCT_DETAILS_COLS_NAMES_SK = ('Obchod', 'Produkt', 'Cena')
 
-    def __init__(self, *args, root: Tk, market_hub: MarketHub, shopping_list_frame: ShoppingListFrame,
+    def __init__(self, *args, root: Tk, market_hub: MarketPlace, shopping_list_frame: ShoppingListFrame,
                  language: Literal['EN', 'SK'] = 'EN',
                  **kw):
         super(MarketExplorerFrame, self).__init__(*args, **kw)
@@ -259,7 +265,7 @@ class MarketExplorerFrame(LabelFrame):
         self.shopping_list = shopping_list_frame
         self.market_hub = market_hub
         self.markets = market_hub.markets()
-        self.market_explorer = MarketExplorer(market_hub=market_hub, limit=5)
+        self.market_explorer = MarketExplorer(market_hub=market_hub, alternatives=5)
 
         self.product_items = shopping_list_frame.product_list.items
         # self.product_items: List[ShoppingListItem] = []
@@ -274,7 +280,11 @@ class MarketExplorerFrame(LabelFrame):
 
         # ---- ExplorerView Configuration ---- #
 
-        self.explorer_view = ExplorerView(self, market_hub=market_hub, bg=BACKGROUND, language=self.language)
+        self.best_markets: List[str] = []
+
+        self.explorer_view = ExplorerView(self, market_hub=market_hub, bg=BACKGROUND, language=self.language,
+                                          )
+        self.explorer_view.bind_options(ordering_options_selected=self.refresh_recommendation)
         self.explorer_view.grid(row=0, column=0, sticky="NSEW", pady=(15, 70))
 
 
@@ -306,7 +316,8 @@ class MarketExplorerFrame(LabelFrame):
         self.explorer_view.detailed_results_table.insert_value(row=0, column=0, value=self.cur_product_details_cols_names[0])
         self.explorer_view.detailed_results_table.insert_value(row=0, column=1, value=self.cur_product_details_cols_names[1])
         self.explorer_view.detailed_results_table.insert_value(row=0, column=2, value=self.cur_product_details_cols_names[2])
-    
+
+        self.search_executed: bool = False
     
     def delete_product(self, item = None):
 
@@ -325,11 +336,12 @@ class MarketExplorerFrame(LabelFrame):
         # self.product_items.remove(item)
     
 
-    def combobox_selected(self, event, box: ttk.Combobox):
+    def combobox_selected(self, event, box: ttk.Combobox, index: int):
         info = box.grid_info()
         cur_price = float(self.explorer_view.detailed_results_table.cells[info['row']][info['column'] + 1].cget('text'))
         new_price = self.product_price_mappings[info['row'] - 1][box.get()]
         market = self.explorer_view.detailed_results_table.cells[info['row']][info['column'] - 1].cget('text')
+
         for i in range(len(self.markets)):
             
             if self.explorer_view.table.cells[0][i + 1][0].get() == market:
@@ -342,6 +354,20 @@ class MarketExplorerFrame(LabelFrame):
         self.explorer_view.detailed_results_table.insert_value(row=info['row'], column=info['column'] + 1, value=
                                               self.product_price_mappings[info['row'] - 1][box.get()])
         
+        row_i = box.grid_info()['row']
+        market_name = self.explorer_view.detailed_results_table.cells[row_i][0].cget("text").upper()
+
+
+        market_ID = None
+        for market in self.markets:
+            if market.name() == market_name:
+                market_ID = market.ID()
+                break
+        else:
+            raise ValueError("Unkown market name!")
+
+     
+        self.market_explorer.swap_expl_products(market_ID=market_ID, expl_1_index=0, expl_2_name=box.get(), product_index=index)
         self.refresh_recommendation()
         
 
@@ -351,10 +377,11 @@ class MarketExplorerFrame(LabelFrame):
         item.on_item_clicked(event=event)
         
 
-        products: List[List[str]] = []
+        product_explorations: List[List[str]] = []
         prices: List[List[float]] = []
 
         market_len = len(self.markets)
+        alternative_limit = self.market_explorer.get_limit()
 
         self.product_price_mappings: List[Dict[str, float]] = []
 
@@ -362,7 +389,7 @@ class MarketExplorerFrame(LabelFrame):
             self.product_price_mappings.append({})
 
         for i in range(market_len):
-            products.append([])
+            product_explorations.append([])
             prices.append([])
 
         markets = []
@@ -373,13 +400,27 @@ class MarketExplorerFrame(LabelFrame):
             #k = (i * 5) + 5
 
             markets.append(self.explorations[i][0].market_ID)
-            prices.append(self.explorations[i][0].products[0][1].price)
+            
+            try:
+                prices[i].append(self.explorations[i][0].product_data[0][1].price)
+            except IndexError:
+                # No products found in the first exploration
+                prices[i].append("---")
+                
 
-            for g in range(5):
+            for g in range(alternative_limit):
                 expl = self.explorations[i][g]
-                self.product_price_mappings[i][expl.products[index][1].name] = expl.products[index][1].price
-                products[i].append(expl.products[index][1].name)
-                prices[i].append(expl.products[index][1].price)
+                
+                try:
+                    self.product_price_mappings[i][expl.product_data[index][1].name] = expl.product_data[index][1].price
+
+                    product_explorations[i].append(expl.product_data[index][1].name)
+                    prices[i].append(expl.product_data[index][1].price)
+                except IndexError:
+              
+                    # no products were found
+                    pass
+        
 
             # for g in range(i * 5, (i * 5) + 5):
                 
@@ -397,12 +438,24 @@ class MarketExplorerFrame(LabelFrame):
 
         combo_boxes = []
 
+
+
+
         for i in range(market_len):
             box = ttk.Combobox(self.explorer_view.detailed_results_table, state='readonly')
             #text = products[i]
-            box['values'] = products[i]
-            box.set(box['values'][0])
-            box.bind('<<ComboboxSelected>>', lambda event, box=box: self.combobox_selected(event, box=box))
+
+            # if no products were found, we
+            box['values'] = product_explorations[i]
+            
+            try:
+                box.set(box['values'][0])
+            except IndexError:
+                # No products were found
+                pass
+  
+            
+            box.bind('<<ComboboxSelected>>', lambda event, box=box: self.combobox_selected(event, box=box, index=index))
    
             combo_boxes.append(box)
 
@@ -452,35 +505,65 @@ class MarketExplorerFrame(LabelFrame):
         return lambda event: self.show_product_details(event=event, index=index, item=item)    
 
 
-    def refresh_recommendation(self):
-        best_market: List[tuple[str, float]] = []
+    def refresh_recommendation(self, _ = None):
+        if not self.search_executed:
+            return
+        
+        self.best_markets.clear()
+        best_metric = -1
 
-        for i in range(len(self.markets)):
+        mode = self.explorer_view.expl_table_ordering_options.current()
+      
 
-            if not best_market or best_market[0][1] == float(self.explorer_view.table.cells[1][i + 1][0].get()):
-                best_market.append(( self.explorer_view.table.cells[0][i + 1][0].get(),
-                                    float(self.explorer_view.table.cells[1][i + 1][0].get()) ))
+        if mode == 0:
+            # here evaluation is based on general metric of explorations, thus on price and availability as well
+
+            for i  in range(len(self.explorations)):
+                first_expl = self.explorations[i][0]
+
+                if not self.best_markets or first_expl.general_metric > best_metric:
+                    self.best_markets.clear()
+                    self.best_markets.append( self.explorer_view.table.cells[0][first_expl.market_ID][0].get())
+                    best_metric = first_expl.general_metric
+                    
+                elif first_expl.general_metric == best_metric:
+                    self.best_markets.append( self.explorer_view.table.cells[0][first_expl.market_ID][0].get())
+        elif mode == 1:
+            # here evalulation is based solely on the total price of the explorations
+
+            for i in range(len(self.markets)):
+                cur_metric = float(self.explorer_view.table.cells[1][i + 1][0].get())
+                if not self.best_markets or best_metric == cur_metric:
+                    self.best_markets.append( self.explorer_view.table.cells[0][i + 1][0].get())
+                    best_metric = cur_metric
+                elif best_metric > cur_metric:
+                    self.best_markets.clear()
+                    self.best_markets.append( self.explorer_view.table.cells[0][i + 1][0].get())
+                    best_metric = cur_metric
+        elif mode == 2:
+            # pass
+            for i in range(len(self.markets)):
+                cur_metric = float(self.explorer_view.table.cells[2][i + 1][0].get())
+                if not self.best_markets or best_metric == cur_metric:
+                    self.best_markets.append( self.explorer_view.table.cells[0][i + 1][0].get())
+                    best_metric = cur_metric
+                elif best_metric < cur_metric:
+                    self.best_markets.clear()
+                    self.best_markets.append( self.explorer_view.table.cells[0][i + 1][0].get())
+                    best_metric = cur_metric
+
+                
+
+
+        
+        for i in range(len(self.explorations)):
+            if self.explorer_view.table.cells[0][i + 1][0].get() in self.best_markets:
+                self.explorer_view.table.insert_value(row=3, col=i + 1, value=self.accept_icon)
             else:
-                if best_market[0][1] > float(self.explorer_view.table.cells[1][i + 1][0].get()):
-                    best_market.clear()
-                    best_market.append(( self.explorer_view.table.cells[0][i + 1][0].get(),
-                                    float(self.explorer_view.table.cells[1][i + 1][0].get()) ))
-             
-
-        for i in range(len(self.markets)):
-
-            for market, price in best_market:
-
-                if self.explorer_view.table.cells[0][i + 1][0].get() == market:
-                    self.explorer_view.table.insert_value(row=3, col=i + 1,
-                                                          value=self.accept_icon)
-                else:
-                    self.explorer_view.table.insert_value(row=3, col=i + 1,
-                                                          value=self.decline_icon)
+                self.explorer_view.table.insert_value(row=3, col=i + 1, value=self.decline_icon)
 
     def explore_product(self, item: ShoppingListItem):
 
-        # self.product_items.append(item)
 
         category = None if item.details.category == 0 else ProductCategory(value=item.details.category)
         item_data = [MarketExplorer.ExplorationParams(target_id=item.details.ID,
@@ -490,88 +573,33 @@ class MarketExplorerFrame(LabelFrame):
                                                       categorization=item.details.category_search_mode,
                                                       weight_unit=item.details.weight_unit,
                                                       weight=item.details.weight)]
-        
-        # item_data = [(item.details.ID,
-        #               TextEditor.standardize_str(item.details.name),
-        #               category,
-        #               item.details.amount)]
+
         
         self.market_explorer.explore(product_list=item_data)
-        #self.product_data.extend(item_data)
 
 
-    def serch_markets(self):
+
+    def search_markets(self):
+        self.search_executed = True
         
-        # self.product_data = self.shopping_list.product_list.get_items()
-        # self.items = self.shopping_list.product_list.items
-        
-        #bind_widgets_recursive(widget=self.items[0], event="<Button-1>", handler=lambda event: self.show_product_details(event=event, item=self.items[0].details))
-        #bind_widgets_recursive(widget=self.items[1], event="<Button-1>", handler=lambda event: self.show_product_details(event=event, item=self.items[1].details))
-
-        
-
         for i, item in enumerate(self.product_items):
             bind_widgets_recursive(widget=item, event="<Button-1>", handler=self.create_handler(index=i, item=item))
-            #bind_widgets_recursive(widget=item, event="<Button-1>", handler=self.do_sth)
 
-            #item.bind_widgets_recursive(event="<Button-1>", handler=lambda event: self.show_product_details(event=event, item=item.details))
 
-        #self.items[0].bind_class(self.items[0].winfo_class(), "<Button-1>", lambda event, item=self.items[0]: self.show_product_details(event, item.details))
-        #self.items[1].bind_class(self.items[1].winfo_class(), "<Button-1>", lambda event, item=self.items[1]: self.show_product_details(event, item.details))
-
-        #self.items[0].bind_class("<Button-1>", lambda event: self.show_product_details(event, self.items[0].details))
-        #self.items[1].bind_class("<Button-1>", lambda event: self.show_product_details(event, self.items[1].details))
-
-        
-        # def create_lambda_handler(item):
-        #     return lambda event, item=item: self.show_product_details(event, item.details)
-    
-        # for item in self.items:
-        #     item.bind_all("<Button-1>", create_lambda_handler(item))
-
-           # item.bind_all("<Button-1>", lambda event, item=item: self.show_product_details(event, item))
-
-        #self.exploration = self.market_explorer.explore(product_list=self.product_data, metric='price', limit=5)
-        
-        #self.market_explorer.expected_size(size=len(self.product_items))
         self.explorations = self.market_explorer.get_explorations()
-        best_market = []
-        best_market.append((self.explorations[0][0].market_ID, self.explorations[0][0].total_price))
-
-
+        
         
         for expl in self.explorations:
             expl = expl[0]
 
-            #if index % 5 == 0:
-            if best_market[0][1] > expl.total_price:
-                best_market.clear()
-                best_market.append((expl.market_ID, expl.total_price))
-            elif best_market[0][1] == expl.total_price:
-                best_market.append((expl.market_ID, expl.total_price))
-            
-            #assert(expl.total_price >= best_price)
 
-            
             self.explorer_view.table.insert_value(row=0, col=expl.market_ID, value=self.market_hub.market(identifier=expl.market_ID).name().lower())
             self.explorer_view.table.insert_value(row=1, col=expl.market_ID, value= round(expl.total_price, 2))
             self.explorer_view.table.insert_value(row=2, col=expl.market_ID, value=round(expl.availability_rate, 2))
             
-        self.explorations = self.market_explorer.get_explorations(metric='price')
-        #self.market_explorer.clear_buffer()
 
-        for expl in self.explorations:
-            expl = expl[0]
-
-           # if index % 5 == 0:
-            if any([market == expl.market_ID for market, price in best_market]):
-                self.explorer_view.table.insert_value(row=3, col=expl.market_ID, value=self.accept_icon)
-            else:
-                self.explorer_view.table.insert_value(row=3, col=expl.market_ID, value=self.decline_icon)
             
-                
-
-        #best_price = self.explorations[0][0].total_price
+        self.refresh_recommendation()        
 
         self.search_bar.grid_forget()
         self.search_bar.config(state="disabled")
@@ -587,16 +615,11 @@ class MarketExplorerFrame(LabelFrame):
             return
 
         self.search_button.config(text="")
-        #self.search_button.set
-
-        #self.search_bar = CircularProgress(self.control_panel, width=40, height=40)
         self.search_bar.grid(row=0, column=1, pady=(5, 12))
         self.search_bar.config(state="normal")
-        # self.control_panel.columnconfigure(0, weight=1)
-        # self.control_panel.columnconfigure(1, weight=1)
 
 
-        thread = threading.Thread(target=self.serch_markets)
+        thread = threading.Thread(target=self.search_markets)
         thread.start()
 
     

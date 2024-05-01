@@ -5,7 +5,7 @@ __VERSION__ = "0.0.1"
 from typing import List, Literal
 from dataclasses import dataclass, field
 
-from AOSS.structure.shopping import MarketHub, RegisteredProduct, ProductCategory, ProductWeightUnit
+from AOSS.structure.shopping import MarketPlace, RegisteredProduct, ProductCategory, ProductWeightUnit
 from AOSS.components.search import ProductMatcher
 
 # class MarketExplorer:
@@ -155,14 +155,14 @@ class MarketExplorer:
         market_ID: int
 
         # setting this only as [] would create a static variable, because of mutable list
-        products: List[tuple[int, RegisteredProduct, float, int]] = field(default_factory=list)
+        product_data: List[tuple[int, RegisteredProduct, float, int]] = field(default_factory=list)
         total_remaining_quantity: int = 0
         total_expected_quantity: int = 0
         total_price: float = 0
 
 
         def __post_init__(self):
-            for product in self.products:
+            for product in self.product_data:
                 expected_quantity = product[3]
                 quantity_left = product[1].quantity_left
                 self.total_remaining_quantity += (quantity_left if quantity_left <= expected_quantity else expected_quantity)
@@ -172,29 +172,55 @@ class MarketExplorer:
             if self.total_expected_quantity > 0:
                 self.availability_rate = (self.total_remaining_quantity/self.total_expected_quantity) * 100
             else:
-                self.availability_rate = -1
-
+                self.availability_rate = 0
+            
+            try:
+                self.general_metric = self.availability_rate / self.total_price
+            except ZeroDivisionError:
+                self.general_metric = 0
+        
+    
+            
 
         def insert_product(self, target_ID: int, product: RegisteredProduct,
                            match_ratio: float, quantity):
             """
-                Inserts a new product match to the exploration. Statistical attributes
+                Inserts a new product match to the exploration manually. Statistical attributes
                 are automatically updated.
             """
-            for existing_product in self.products:
+            for existing_product in self.product_data:
 
                 if existing_product[0] == target_ID:
                     raise ValueError("""Exploration instance cannot contain several products
                                      with the same target ID!""")
             
-            self.products.append((target_ID, product, match_ratio, quantity))
+            self.product_data.append((target_ID, product, match_ratio, quantity))
             
             self.total_price += product.price
             self.total_expected_quantity += quantity
             self.total_remaining_quantity += (product.quantity_left if product.quantity_left <= quantity else quantity)
             self.availability_rate = (self.total_remaining_quantity/self.total_expected_quantity) * 100
+            self.general_metric = self.availability_rate / self.total_price
       
 
+        def replace_product(self, replacement: tuple[int, RegisteredProduct, float, int]):
+            for index, data in enumerate(self.product_data):
+                if data[0] == replacement[0]:
+                    self.total_expected_quantity -= data[3]
+                    self.total_price -= data[1].price
+                    self.total_remaining_quantity -= data[3] if data[3] < data[1].quantity_left else data[1].quantity_left
+
+                    self.total_expected_quantity += replacement[3]
+                    self.total_price += replacement[1].price
+                    self.total_remaining_quantity += replacement[3] if replacement[3] < replacement[1].quantity_left else replacement[1].quantity_left
+                    
+                    self.availability_rate = (self.total_remaining_quantity/self.total_expected_quantity) * 100
+                    self.general_metric = self.availability_rate / self.total_price
+                    self.product_data[index] = replacement
+                    break
+            else:
+                raise ValueError("Invalid target ID!")
+            
 
     """
          This class explores list of registered markets and attempts to recommend the best one according to a criterium (mostly price).
@@ -202,27 +228,30 @@ class MarketExplorer:
     """
 
     
-    def __init__(self, market_hub: MarketHub, limit: int = 1) -> None:
+    def __init__(self, market_hub: MarketPlace, alternatives: int = 1) -> None:
         self.__market_hub = market_hub
         self.__matcher = ProductMatcher(market_hub=self.__market_hub)
      
         self.__markets = self.__market_hub.markets()
         self.__explorations: List[List[MarketExplorer.Exploration]] = []
-        self.__limit = limit
+        self.__alternatives = alternatives
 
         for index, market in enumerate(self.__markets):
             self.__explorations.append([])
 
-            for _ in range(self.__limit):
+            for _ in range(self.__alternatives):
                 self.__explorations[index].append(MarketExplorer.Exploration(market_ID=market.ID(),
                                                                       total_price=0,
-                                                                      products=[]))
+                                                                      product_data=[]))
+
+    def get_limit(self):
+        return self.__alternatives
 
     def set_limit(self, value: int):
         if self.__explorations:
             raise ValueError("Explorer contains some explorations! Remove them first.")
 
-        self.__limit = value
+        self.__alternatives = value
 
 
 
@@ -236,10 +265,10 @@ class MarketExplorer:
 
         for i in range(len(self.__markets)):
 
-            for g in range(self.__limit):
+            for g in range(self.__alternatives):
                 expl = self.__explorations[i][g]
                 expl.total_expected_quantity = size
-                expl.availability_rate = expl.total_expected_quantity/len(expl.products)
+                expl.availability_rate = expl.total_expected_quantity/len(expl.product_data)
 
 
 
@@ -247,12 +276,12 @@ class MarketExplorer:
 
         for i in range(len(self.__markets)):
 
-            for g in range(self.__limit):
+            for g in range(self.__alternatives):
                 expl = self.__explorations[i][g]
 
-                for product in expl.products:
+                for product in expl.product_data:
                     if product[0] == ID:
-                            expl.products.remove(product)
+                            expl.product_data.remove(product)
                             expl.total_expected_quantity -= product[3]
                             expl.total_price -= product[1].price
                             quatity_left = product[3] if product[3] <= product[1].quantity_left else product[1].quantity_left
@@ -269,6 +298,35 @@ class MarketExplorer:
 
 
         return self.__explorations
+
+    def swap_expl_products(self, market_ID: int, expl_1_index: int, expl_2_name: str, product_index: int):
+        exploration_list = None
+
+        for expl in self.__explorations:
+            if expl[0].market_ID == market_ID:
+                exploration_list = expl
+                break
+        else:
+            raise ValueError("Invalid market ID!")
+
+        expl_1 = exploration_list[expl_1_index]
+        expl_2  = None
+
+        for expl in exploration_list:
+            if expl.product_data[product_index][1].name == expl_2_name:
+                expl_2 = expl
+                break
+        else:
+            raise ValueError("Product name not found!")
+        
+
+        expl_1_product_data = expl_1.product_data[product_index]
+        expl_2_product_data = expl_2.product_data[product_index]
+
+        expl_1.replace_product(replacement=expl_2_product_data)
+        expl_2.replace_product(replacement=expl_1_product_data)
+
+
 
 
 
@@ -300,17 +358,19 @@ class MarketExplorer:
                 match_record = self.__matcher.match(text=params.product_name,
                                                     markets=(market.ID(),),
                                                     category=params.product_category,
-                                                    limit=self.__limit,
+                                                    limit=self.__alternatives,
                                                     sort_words=True,
                                                     weight_unit=params.weight_unit,
                                                     weight=params.weight)
 
-                for i in range(self.__limit):
+                alternative_count = self.__alternatives if len(match_record) > self.__alternatives else len(match_record)
+
+                for i in range(alternative_count):
 
                     expl = self.__explorations[index][i]
-                    lel=market.get_product(identifier=match_record[i].product_ID)
+                    product=market.get_product(identifier=match_record[i].product_ID)
                     expl.insert_product(target_ID=params.target_id,
-                                        product=lel,
+                                        product=product,
                                         match_ratio=match_record[i].ratio,
                                         quantity=params.required_quantity)
             

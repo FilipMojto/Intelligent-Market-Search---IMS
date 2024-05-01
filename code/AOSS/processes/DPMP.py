@@ -16,7 +16,7 @@ sys.path.append(parent_directory)
 
 
 from config_paths import *
-from AOSS.structure.shopping import MarketHub, Market, ProductCategory
+from AOSS.structure.shopping import MarketPlace, Market, ProductCategory
 from AOSS.components.categorization import ProductCategorizer
 from AOSS.components.categorization import process_product
 from AOSS.other.exceptions import IllegalProductState
@@ -45,7 +45,7 @@ market_hub_lock = threading.Lock()
 
 
 def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr.Queue, hub_to_gui: mpr.Queue,
-          gui_to_hub: mpr.Queue, product_file_lock: mpr.Lock):
+          gui_to_hub: mpr.Queue, product_file_lock: mpr.Lock, console_log: bool = True):
     
     update_interval = 0
     request_generator = ScrapeRequestGenerator()
@@ -61,7 +61,7 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
     def signal_handler(signum):
 
         if signum == 2:
-            # Since proess might be in the middle of update or something like that, 
+            # Since process might be in the middle of update or something like that, 
             # some exceptions might be uncaught
             try:
                 print("Terminating marketing process...")
@@ -83,7 +83,7 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
         
         time.sleep(timeout)
    
-    def request_missing_categories(market: Market):
+    def request_missing_categories(market: Market, console_log: bool = True):
         nonlocal request_generator
 
         """
@@ -103,7 +103,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
             if len( product_df.filter( (product_df['market_ID'] == market.ID() ) &
                                     (product_df['query_string_ID'] == ID) )) == 0:
                 
-                print(f"Detected no products for market {market.name()}. Category: {name}")
+                if console_log:
+                    print(f"Detected no products for market {market.name()}. Category: {name}")
                 empty_categories.append(ID)
             
         # now we create a request if needed
@@ -116,7 +117,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
 
 
 
-    def send_or_wait(main_to_all: mpr_conn.PipeConnection, hub_to_scraper: mpr.Queue, request: ScrapeRequest):
+    def send_or_wait(main_to_all: mpr_conn.PipeConnection, hub_to_scraper: mpr.Queue, request: ScrapeRequest,
+                     console_log: bool = True):
         """
             Attempts to send a ScrapeRequest instance via hub-to-scraper Queue. If the request was not sent
             because the queue is full it waits some time before trying again. Basically this function loops
@@ -128,13 +130,14 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                 hub_to_scraper.put(obj=request, block=False)
                 break
             else:
-                print("Unable to send scraping request!. Retrying...")
+                if console_log:
+                    print("Unable to send scraping request!. Retrying...")
                 check_main(main_to_all=main_to_all)
                 time.sleep(1)
 
 
     def perform_full_refresh(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr.Queue,
-                              market_hub: MarketHub, categorizer: ProductCategorizer):
+                              market_hub: MarketPlace):
 
         markets = market_hub.markets()
 
@@ -166,10 +169,12 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                         if not market.is_registered(product_name=product.name):
 
                             market.register_product(product=product)
-                            print(f"Registered successfully: {{{product.name}}}")
+                            if console_log:
+                                print(f"Registered successfully: {{{product.name}}}")
                         else:
                             try:
-                                print(f"Product {{{product.name}}} already registered!")
+                                if console_log:
+                                    print(f"Product {{{product.name}}} already registered!")
                                 market.update_product(product=product)
                             except IllegalProductState:
                                 pass
@@ -177,20 +182,10 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                     market.save_products(remove_if_outdated=True)
                     break
 
-                        # except IllegalProductState:
-                        #     print(f"Product {{{product.name}}} already registered!")
-                        #     market.update_product(product=product)
-                                
-        # for market in markets:
-            
 
 
 
-
-
-
-
-    def send_progress_signal(hub_to_gui: mpr.Queue, main_to_all: mpr.Queue, progress: int):
+    def send_progress_signal(hub_to_gui: mpr.Queue, main_to_all: mpr.Queue, progress: int, console_log: bool = True):
         assert(0<=progress<=100)
 
         while hub_to_gui.full():
@@ -222,7 +217,7 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
     #start_market_hub(main_to_all=main_to_all, hub_to_scraper=hub_to_scraper, scraper_to_hub=scraper_to_hub, hub_to_gui=hub_to_qui)
 
     # loads all registered markets within the main market hub
-    hub = MarketHub(src_file=MARKET_HUB_FILE['path'])   
+    hub = MarketPlace(src_file=MARKET_CENTER_FILE['path'], console_log=console_log)   
     hub.load_markets()
 
     # loads all product data within the market hub but only when the lock is acquired, this is
@@ -243,19 +238,22 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
     check_main(main_to_all=main_to_all)
 
     # analyzing training market
-    send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.TRAINING_MARKET_ANALYSIS)
+    send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.TRAINING_MARKET_ANALYSIS,
+                         console_log=console_log)
 
     training_market = hub.training_market()
-    request_missing_categories(market=training_market)
+    request_missing_categories(market=training_market, console_log=console_log)
     
-    send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.MARKETS_ANALYSIS)
+    send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.MARKETS_ANALYSIS,
+                         console_log=console_log)
 
 
     for market in markets:
         if market.ID() == training_market.ID(): continue
         request_missing_categories(market=market)
 
-    send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.SCRAPING_MISSING_DATA)
+    send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.SCRAPING_MISSING_DATA,
+                         console_log=console_log)
 
     
     if requests:
@@ -316,7 +314,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                         progress += progress_rate
                         break
                 else:
-                    print("Unsupported response type!")
+                    if console_log:
+                        print("Unsupported response type!")
             
             time.sleep(1.5)
 
@@ -343,7 +342,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
     # if the update delay has reached MAX_UPDATE_DALAY, request for exhaustive data update is sent
     # to GUI process
     if (update_delay.total_seconds())/60 > MAX_UPDATE_DELAY:
-        print("Detected a lot of out-of-date data! Sending request...")
+        if console_log:
+            print("Detected a lot of out-of-date data! Sending request...")
         send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.UPDATING_DATA)
         
         # process waits until response is received
@@ -356,7 +356,7 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
         if(isinstance(response, tuple) and response[1] == 1):
             
             perform_full_refresh(main_to_all=main_to_all, hub_to_scraper=hub_to_scraper,
-                                 scraper_to_hub=scraper_to_hub, market_hub=hub, categorizer=categorizer)
+                                 scraper_to_hub=scraper_to_hub, market_hub=hub)
             # hub.remove_local_products()
             # return start(main_to_all, hub_to_scraper, scraper_to_hub, hub_to_gui,
             #     gui_to_hub, product_file_lock)
@@ -371,7 +371,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
     send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.FINISHING_POINT)
     hub.update()
 
-    print("Starting update process...")
+    if console_log:
+        print("Starting update process...")
     processed_categories: List[str] = []
     
 
@@ -382,8 +383,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
         # sorting the product dataframe by the updated_at attribute
         # we find the earliest updated record in dataframe
     
-
-        print(f"The difference between {current_date} and {timestamp} is: {update_delay.total_seconds()/60}")
+        if console_log:
+            print(f"The difference between {current_date} and {timestamp} is: {update_delay.total_seconds()/60}")
 
 
         earliest_updated = sorted_df.filter(sorted_df['query_string_ID'].is_in(processed_categories).not_()).head(1)
@@ -396,7 +397,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
         # market
         category_products = product_df.filter(product_df['query_string_ID'] == earliest_updated['query_string_ID'])['name'].to_list()
         
-        print(f"Updating category {earliest_updated['query_string_ID'][0]} of market {earliest_updated['market_ID'][0]}.")
+        if console_log:
+            print(f"Updating category {earliest_updated['query_string_ID'][0]} of market {earliest_updated['market_ID'][0]}.")
     
 
         # now we create a ScrapeRequest isntance and send it to the scraper process
@@ -418,7 +420,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
 
             # case in which we should receive updated product data
             if isinstance(response, list):
-                print("Received scraped data! Processing...")
+                if console_log:
+                    print("Received scraped data! Processing...")
                 
                 for product, market_ID in response:
                     check_main(main_to_all=main_to_all, timeout=0.001)
@@ -438,7 +441,8 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                         try:
                             market.update_product(product=product)
 
-                            print(f"Updated successfully: {product.name}")
+                            if console_log:
+                                print(f"Updated successfully: {product.name}")
                             try:
                                 # we remove this product as it has been updated and is still at disposal
                                 category_products.remove(product.name)
@@ -458,12 +462,15 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                             try:
                                 
                                 market.register_product(product=product, norm_category=category)
-                                print(f"Registered successfully: {{{product.name}}}")
+                                if console_log:
+                                    print(f"Registered successfully: {{{product.name}}}")
                             except IllegalProductState:
-                                print(f"Product {{{product.name}}} already registered!")
+                                if console_log:
+                                    print(f"Product {{{product.name}}} already registered!")
 
                     else:
-                        print("Received response contains invalid market ID!")
+                        if console_log:
+                            print("Received response contains invalid market ID!")
             
             
             # case in which we should receive the ScrapeProcessTerminationSignal
@@ -477,11 +484,12 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                     if category_products:
                         market.remove_products(identifiers=category_products)
                     
-
-                    print(f"Request {processed_request.ID} fulfilled!")
+                    if console_log:
+                        print(f"Request {processed_request.ID} fulfilled!")
 
                     while hub_to_gui.full():
-                        print("GUI's queue is full! Retrying...")
+                        if console_log:
+                            print("GUI's queue is full! Retrying...")
                         check_main(main_to_all=main_to_all)
                     
                     hub_to_gui.put(obj=(UPDATE_PRODUCTS_SIGNAL,), block=False)
@@ -498,9 +506,11 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                         hub.load_products()
                     break
                 else:
-                    print("Received invalid Scrape Process Termination Signal!")
+                    if console_log:
+                        print("Received invalid Scrape Process Termination Signal!")
             else:
-                print("Unsupported response type!")
+                if console_log:
+                    print("Unsupported response type!")
             
             check_main(main_to_all=main_to_all)
 

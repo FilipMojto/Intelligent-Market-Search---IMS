@@ -15,6 +15,7 @@ parent_directory = os.path.abspath(os.path.join(script_directory, '..'))
 sys.path.append(parent_directory)
 
 MAIN_TERMINATION_SIGNAL = "-end"
+CONSOLE_LOG = False
 
 
 
@@ -73,17 +74,19 @@ def launch_subprocesses():
     
     
     market_hub = mpr.Process(target=dpmp_start, args=(shared_termination_signal, hub_to_scraper, scraper_to_hub, hub_to_qui,
-                                                     gui_to_hub, product_file_lock))
+                                                     gui_to_hub, product_file_lock, CONSOLE_LOG))
     
     market_hub.start()
     processes.append(market_hub)
 
-    scraper = mpr.Process(target=dspp_start, args=(shared_termination_signal, scraper_to_hub, hub_to_scraper))
+    scraper = mpr.Process(target=dspp_start, args=(shared_termination_signal, scraper_to_hub, hub_to_scraper,
+                                                   CONSOLE_LOG))
     scraper.start()
     processes.append(scraper)
     
 
-    gui = mpr.Process(target=gui_start, args=(shared_termination_signal, gui_to_main, hub_to_qui, gui_to_hub, product_file_lock))
+    gui = mpr.Process(target=gui_start, args=(shared_termination_signal, gui_to_main, hub_to_qui, gui_to_hub,
+                                              product_file_lock, CONSOLE_LOG))
     gui.start()
     processes.append(gui)
 

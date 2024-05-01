@@ -28,6 +28,7 @@ class ShoppingListDetails(LabelFrame):
     FONT_BOLD = ('Arial', 11, 'bold')
     LABELS_EN = ('Name:', 'Category:', 'Amount:', 'Weight Unit:', 'Weight:')
     LABELS_SK = ('Meno:', 'Kategória:', 'Množstvo', 'Jednotka:', 'Váha:')
+    MAX_LABEL_LENGTH = 20
 
     def __init__(self, *args, name: str, category: int, amount: int,
                  weight_unit: ProductWeightUnit = ProductWeightUnit.NONE, weight: float,
@@ -56,6 +57,11 @@ class ShoppingListDetails(LabelFrame):
         self.name_label.grid(row=0, column=0, sticky="NSW")
         self.name_label.bind("<Button-1>", on_widget_click)
 
+        truncated_name = self.name[:self.MAX_LABEL_LENGTH] + '...' if len(self.name) > self.MAX_LABEL_LENGTH else self.name
+        
+        # Set the truncated name to the text variable
+        self.name_text.set(f"{self.cur_labels[0]} {truncated_name}")
+
         
         self.category_search_mode = category_search_mode
 
@@ -78,11 +84,6 @@ class ShoppingListDetails(LabelFrame):
         self.weight_text = DoubleVar()
         self.weight_text.set(f"{self.cur_labels[4]} {weight}")
 
-
-
-        
-
-    
 
         
         self.second_line = Frame(self)
@@ -110,12 +111,15 @@ class ShoppingListDetails(LabelFrame):
         self.third_line.rowconfigure(0, weight=1)
         self.third_line.columnconfigure(0, weight=1)
         self.third_line.columnconfigure(1, weight=1)
+        self.third_line.bind("<Button-1>", on_widget_click)
 
         self.weight_unit_label = Label(self.third_line, textvariable=self.weight_unit_text, font=self.FONT)
         self.weight_unit_label.grid(row=0, column=0, sticky="W")
+        self.weight_unit_label.bind("<Button-1>", on_widget_click)
 
         self.weight_label = Label(self.third_line, textvariable=self.weight_text, font=self.FONT)
         self.weight_label.grid(row=0, column=1, sticky="E")
+        self.weight_label.bind("<Button-1>", on_widget_click)
         
 
         self.ID = ID
@@ -164,8 +168,10 @@ class ShoppingListItem(Frame):
         self.is_clicked_on = False
     
     def on_item_clicked(self, event):
+        if self.is_clicked_on:
+            return
         self.on_widget_click()
-        self.details.configure(bd=3)
+        self.details.configure(bd=4)
         self.is_clicked_on = True
 
 

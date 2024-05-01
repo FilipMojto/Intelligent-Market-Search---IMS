@@ -20,7 +20,7 @@ os.chdir(parent_directory)
 
 from config_paths import *
 from AOSS.gui.main_window import MainWindow
-from AOSS.structure.shopping import MarketHub
+from AOSS.structure.shopping import MarketPlace
 from typing import Literal
 
 
@@ -30,12 +30,21 @@ class Application(tkinter.Tk):
     BETA = True
     WIDTH = '1220'
     HEIGHT = '640'
-
+    RESIZABLE = False
     
     LANGUAGE: Literal['EN', 'SK'] = 'EN'
     MAIN_MENU_ITEMS_EN = ('Shopping List', 'Market Explorer', 'Settings', 'Exit')
     MAIN_MENU_ITEMS_SK = ('Nákupný zoznam', 'Hľadanie obchodov', 'Nastavenia', 'Odísť')
     
+    def bind_children(self, widget, event, handler):
+        print("BINDING")
+        # Bind the event to the current widget
+        widget.bind(event, handler)
+        
+        # Recursively bind the event to all children widgets
+        for child in widget.winfo_children():
+            self.bind_children(child, event, handler)
+
             
     def __init__(self, *args, lock: mpr.Lock = None, gui_to_hub: mpr.Queue = None,
                  language: Literal['EN', 'SK'] = 'SK', **kw) -> None:
@@ -46,7 +55,7 @@ class Application(tkinter.Tk):
 
         
 
-        self.market_hub = MarketHub(src_file=MARKET_HUB_FILE['path'])
+        self.market_hub = MarketPlace(src_file=MARKET_CENTER_FILE['path'])
         self.market_hub.load_markets()
 
         if lock:
@@ -59,6 +68,8 @@ class Application(tkinter.Tk):
         self.geometry("+50+50") 
         self.geometry(self.WIDTH + 'x' + self.HEIGHT)
 
+        self.resizable(self.RESIZABLE, self.RESIZABLE)
+
         
         self.main_view = MainWindow(self, root=self, app_name=self.NAME, app_version=__VERSION__, is_beta=self.BETA,
                                     language=language,
@@ -69,7 +80,10 @@ class Application(tkinter.Tk):
         
         self.bind("<Key>", lambda event, main_view=self.main_view: main_view.on_key_press(event, main_view))
 
-
+        self.bind_children(self, "<<Button-1>>", self.on_click)
+    
+    def on_click(self):
+        print("CLICKED!")
 
 
 

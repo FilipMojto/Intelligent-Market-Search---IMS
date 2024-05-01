@@ -540,7 +540,7 @@ class Market(MarketView):
 
 
 
-class MarketHub(ProductIdentification):
+class MarketPlace(ProductIdentification):
 
     """
         MarketHub provides an effective system for market storage and management.
@@ -572,12 +572,14 @@ class MarketHub(ProductIdentification):
 
     # ------ MarketHub Constructor ------- #
 
-    def __init__(self, src_file: str) -> None:
+    def __init__(self, src_file: str, console_log: bool = True) -> None:
 
         """
             Constructs a MarketHub object by loading its metadata from a provided source file.
             Source file must follow CSV format.
         """
+        
+        self.console_log = console_log
 
         # this ensures that the provided source file exists
         if PathManager.check_if_exists(path=src_file, type='file'):
@@ -613,27 +615,33 @@ class MarketHub(ProductIdentification):
         
 
 
-    def __enter__(self):
+    def __enter__(self, console_log: bool = None):
         """
             Apart from constructing a MarketHub object this also automatically loads the 
         """
 
-        print("Loading markets from a file...")
+        if (console_log is not None and console_log) or self.console_log:
+            print("Loading markets from a file...")
+  
+
         self.load_markets()
         self.load_products()
         
-        print(f"Successfully loaded {len(self.__markets)} markets!")
+        if (console_log is not None and console_log) or self.console_log:
+            print(f"Successfully loaded {len(self.__markets)} markets!")
+
         return self
     
-    def __exit__(self, exc_type, exc_value, traceback):
-        print("Updating hub stats to file...")
-        self.update()
+    def __exit__(self, exc_type, exc_value, traceback, console_log: bool = None):
+        if (console_log is not None and console_log) or self.console_log:
+            print("Updating hub stats to file...")
+        self.update(console_log=console_log)
         
 
 
     # ------ MarketHub - Public Interface ------- #
 
-    def load_markets(self, console_log: bool = False):
+    def load_markets(self, console_log: bool = None):
 
         """
             Loads metadata about markets stored in the Market File and stores them as Market objects
@@ -657,13 +665,14 @@ class MarketHub(ProductIdentification):
                     ID = int(metadata['ID'])
                 except ValueError:
 
-                    if console_log:
+                    if (console_log is not None and console_log) or self.console_log:
                         print(f"Error at line {index}: Failed to load ID attribute.")
                 
                 name = metadata['name']
                 store_name = metadata['store_name']
 
-                if (name is None or not name or store_name is None or not store_name) and console_log:
+                if (name is None or not name or store_name is None or not store_name) and (
+                    (console_log is not None and console_log) or self.console_log):
                     print(f"Error at line {index}: Failed to load name or store_name attribute.")
 
 
@@ -677,7 +686,7 @@ class MarketHub(ProductIdentification):
                     PathManager.check_if_exists(path=category_file)
 
                 except ValueError:
-                    if console_log:
+                    if (console_log is not None and console_log) or self.console_log:
                         print(f"Error at line {index}: Invalid Product File or Category File paths.")
 
                 # checks the consistence of Product and Category File paths
@@ -685,7 +694,7 @@ class MarketHub(ProductIdentification):
                     self.__product_file = product_file
                     self.__category_file = category_file
                 elif ((self.__product_file != product_file or self.__category_file != category_file)
-                    and console_log):
+                    and ((console_log is not None and console_log) or self.console_log)):
                     print(f"Error at line {index}: Inconsistent Product File or Category File paths.")
 
                 new_market = Market(ID=ID,
@@ -697,7 +706,7 @@ class MarketHub(ProductIdentification):
                             )
 
 
-                if not self.can_register(market=new_market) and console_log:
+                if not self.can_register(market=new_market) and ((console_log is not None and console_log) or self.console_log):
                     print("Error at line {index}: Market cannot be aggregated by the market hub!")
 
 
@@ -711,6 +720,11 @@ class MarketHub(ProductIdentification):
 
 
     def load_dataset(self):
+        """
+            This function (re)loads current dataframe by reading it as a polars dataset. The csv format
+            is requested.
+        """
+
         if self.__product_file is not None:
 
             self.__product_df = pl.read_csv(self.__product_file)
@@ -737,7 +751,7 @@ class MarketHub(ProductIdentification):
             market_data[0].load_products()
 
 
-    def update(self):
+    def update(self, console_log: bool = None):
         """
             This method updates MarketHub metadata (product_ID and market_ID) by
             writing it back to the source file.
@@ -780,7 +794,8 @@ class MarketHub(ProductIdentification):
         with open(self.__market_file, mode='w', newline='', encoding='utf-8') as file:
             file.writelines(lines)
 
-        print("Data updated successfully!")
+        if (console_log is not None and console_log) or self.console_log:
+            print("Data updated successfully!")
 
         
 

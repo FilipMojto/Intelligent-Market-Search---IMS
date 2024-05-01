@@ -3,11 +3,11 @@ import time
 
 from config_paths import *
 
-from AOSS.structure.shopping import MarketHub
+from AOSS.structure.shopping import MarketPlace
 from AOSS.components.categorization import ProductCategorizer
 
 
-with MarketHub(src_file=MARKET_HUB_FILE['path']) as hub:
+with MarketPlace(src_file=MARKET_CENTER_FILE['path']) as hub:
     with open(file=PRODUCT_FILE['path'], mode='r', encoding='utf-8') as file:
         products = list(csv.reader(file)) # Convert the iterator to a list
 

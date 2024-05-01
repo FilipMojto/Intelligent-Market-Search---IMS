@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 from config_paths import *
-from AOSS.structure.shopping import Product, ProductCategory, MarketHub
+from AOSS.structure.shopping import Product, ProductCategory, MarketPlace
 from AOSS.components.search import ProductMatcher
 from AOSS.other.exceptions import InvalidFileFormatError
 from AOSS.other.utils import TextEditor
@@ -158,7 +158,7 @@ class ProductCategorizer:
                 raise ValueError("Target category is not found!")
 
 
-    def __init__(self, market_hub: MarketHub) -> None:
+    def __init__(self, market_hub: MarketPlace) -> None:
         if not market_hub.can_categorize():
             raise ValueError("""Cannot categorize product because training market is unspecified or contains no data for one of
                          its categories!""")

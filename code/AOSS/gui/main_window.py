@@ -21,7 +21,7 @@ from AOSS.gui.product_specification import ProductSpecificationMenu
 from AOSS.gui.market_explorer import MarketExplorerFrame
 from AOSS.gui.settings import SettingsFrame
 
-from AOSS.structure.shopping import MarketHub
+from AOSS.structure.shopping import MarketPlace
 from AOSS.other.exceptions import InvalidApplicationState
 
 
@@ -78,7 +78,7 @@ class MainWindow(Frame):
                                                       on_delete=lambda item: self.market_explorer_window.delete_product(item))
         self.shopping_list_window.pack(side='right', fill='y', expand=False, pady=6, padx=(3, 5))
         
-        market_hub = MarketHub(src_file=cfg.MARKET_HUB_FILE['path'])
+        market_hub = MarketPlace(src_file=cfg.MARKET_CENTER_FILE['path'])
         market_hub.load_markets()
         market_hub.load_products()
 
@@ -233,6 +233,7 @@ class MainMenu(Frame):
         for child in self.parent.main_window.winfo_children():
             child.pack_forget()
 
+        self.parent.specification_window.modal_window.withdraw()
         self.parent.specification_window.pack_forget()
         self.parent.market_explorer_window.pack(side='right', fill='both', expand=True, pady=6, padx=(0, 3))
         self.parent.list_frame.pack(side='left', fill='both', expand=True)

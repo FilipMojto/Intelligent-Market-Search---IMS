@@ -33,7 +33,7 @@ MARKET_FILE = DATA["markets"]
 PRODUCT_FILE = DATA["products"]
 CATEGORY_FILE = DATA["categories"]
 CATEGORY_MAP_FILE = DATA["category_mappings"]
-MARKET_HUB_FILE = DATA["market_hubs"]
+MARKET_CENTER_FILE = DATA["market_hubs"]
 SEARCHED_PRODUCTS_FILE = DATA["searched_products"]
 
 

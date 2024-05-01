@@ -371,12 +371,13 @@ class ProductScraper:
     _MARKET_MENU_URL = "/menu"
     _MARKET_CATEGORY_URL = "/categories/slug/"
 
-    def __init__(self, market: Market) -> None:
+    def __init__(self, market: Market, console_log: bool = True) -> None:
         """
             Creates an instance dependent on the provided Market instance.
         """
 
         self.__market = market
+        self.__console_log = console_log
         self.__categories = market.categories()
         self.__url = ProductScraper._BASE_URL + self.__market.store_name() + ProductScraper._MARKET_MENU_URL
 
@@ -389,7 +390,7 @@ class ProductScraper:
 
 
     def scrape_categories(self, identifiers: tuple[int, ...], mode: Literal['ID', 'index'] = 'ID', products: List[tuple[Product, int]] = None,
-                          console_log: bool = False):
+                          console_log: bool = None):
         
         """
             This function allows filtering the scraped to only certain categories provided by the market.
@@ -444,7 +445,7 @@ class ProductScraper:
                         break
                 
                 if not category_name in market_categories:
-                    if console_log:
+                    if (console_log is not None and console_log) or self.__console_log:
                         print(f"Category {category_name} filtered out!")
                     continue
                 
@@ -576,7 +577,7 @@ class ProductScraper:
 
                 products.append( (new_product, self.__market.ID()) )
                 
-                if console_log:
+                if (console_log is not None and console_log) or self.__console_log:
                     print(f"Scraped successfully: {new_product}")
 
         else:
@@ -585,16 +586,7 @@ class ProductScraper:
         if _return:
             return products
 
-    # def get_categories(self):
-    #     url = self.__url
-    #     response = requests.get(url)
-
-    #     if response.status_code == 200:
-    #         data = response.json()
-
-    #         for category in data['categories']:
-                
-    #             print(category.get('slug'))
+  
 
 
 
@@ -623,7 +615,7 @@ class ProductScraper:
                         break
                 
                 if not category_name in self.__categories.values():
-                    if console_log:
+                    if (console_log is not None and console_log) or self.__console_log:
                         print(f"Category {category_name} not supported by current market! Skipping...")
                     continue
 
@@ -649,7 +641,7 @@ class ProductScraper:
 
                 products.append( (new_product, self.__market.ID()) )
                 
-                if console_log:
+                if (console_log is not None and console_log) or self.__console_log:
                     print(f"Scraped successfully: {new_product}")
 
         else:

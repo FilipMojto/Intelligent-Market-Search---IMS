@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 
 
 
-from AOSS.structure.shopping import MarketHub, ProductCategory, ProductWeightUnit
+from AOSS.structure.shopping import MarketPlace, ProductCategory, ProductWeightUnit
 from AOSS.other.utils import get_mapped_category
 from config_paths import *
 
@@ -164,7 +164,7 @@ class ProductMatcher:
 
 
 
-    def __init__(self, market_hub: MarketHub) -> None:
+    def __init__(self, market_hub: MarketPlace) -> None:
         
         self.__market_hub = market_hub
         self.__markets = self.__market_hub.markets()
@@ -253,10 +253,15 @@ class ProductMatcher:
         else:
             df = self.__product_df
         
+        if df.is_empty():
+            return []
+        
         # filtering products belonging to a subset of markets
         if markets is not None and markets:
             df = df.filter(self.__product_df['market_ID'].is_in(markets))
 
+        if df.is_empty():
+            return []
         # weight_str = str(weight)
 
         if weight_unit != ProductWeightUnit.NONE and weight > 0:
@@ -264,6 +269,8 @@ class ProductMatcher:
                 (polars.col('weight_unit') == weight_unit.name) & (polars.col('weight') == weight)
             )
 
+        if df.is_empty():
+            return []
 
         # filtering products by their category
         if category is not None:
@@ -276,6 +283,8 @@ class ProductMatcher:
             elif categorization == 'TM-based Mapping':    
                 df = df.filter(df['category'] == category.name)
 
+        if df.is_empty():
+            return []
 
         try:    
             df = df.apply(lambda row: self.__extract_cols(row, text, sort=sort_words))

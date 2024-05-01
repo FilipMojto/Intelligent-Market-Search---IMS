@@ -8,7 +8,7 @@ from tkinter import font
 
 import config_paths
 
-from AOSS.structure.shopping import MarketHub, ProductCategory
+from AOSS.structure.shopping import MarketPlace, ProductCategory
 from code.AOSS.components.marexp import MarketExplorer, Market
 from code.AOSS.components.categorization import ProductCategorizer
 from AOSS.other.utils import TextEditor
@@ -511,7 +511,7 @@ class MarketExplorerView(LabelFrame):
         super(MarketExplorerView, self).__init__(*args, **kw)
         global product_file_lock
 
-        self.market_hub = MarketHub(src_file=config_paths.MARKET_HUB_FILE['path'])
+        self.market_hub = MarketPlace(src_file=config_paths.MARKET_CENTER_FILE['path'])
         self.market_hub.load_markets()
 
         with product_file_lock:

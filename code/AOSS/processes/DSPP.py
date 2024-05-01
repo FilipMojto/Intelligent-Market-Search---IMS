@@ -19,7 +19,7 @@ os.chdir(parent_directory)
 
 from config_paths import *
 from AOSS.processes.IPC import ScrapeRequest
-from AOSS.structure.shopping import MarketHub, Product
+from AOSS.structure.shopping import MarketPlace, Product
 from AOSS.components.scrape import ProductScraper
 
 
@@ -61,7 +61,7 @@ def check_main(main_to_all, timeout: float = 1.5):
 
 
 
-def __check_market_hub(hub_to_scraper: mpr.Queue):
+def __check_market_hub(hub_to_scraper: mpr.Queue, console_log: bool = True):
     """
         This function checks for any incoming request from the market hub process.
 
@@ -75,7 +75,7 @@ def __check_market_hub(hub_to_scraper: mpr.Queue):
         if isinstance(msg, ScrapeRequest):
             global requests
             requests.append(msg)
-        else:
+        elif console_log:
             print("Unexpected object type from hub-to-scraper connection!")
 
 
@@ -90,9 +90,9 @@ def __scrape_products(scraper: ProductScraper, request: ScrapeRequest):
     products_ = None
 
     if request.categories is None:
-        products_ = scraper.scrape_all(console_log=True)
+        products_ = scraper.scrape_all()
     else:
-        products_ = scraper.scrape_categories(identifiers=request.categories, mode='ID', console_log=True)
+        products_ = scraper.scrape_categories(identifiers=request.categories, mode='ID')
 
     with product_lock:
         global products
@@ -103,7 +103,7 @@ def __scrape_products(scraper: ProductScraper, request: ScrapeRequest):
 
 
 
-def process_requests(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue):
+def process_requests(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue, console_log: bool = True):
 
     global active_scraper, processed_request, products
 
@@ -127,7 +127,8 @@ def process_requests(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue):
             
             # case in which an invalid request was received, program simply dumps such requests
             else:
-                print("Received a request with unknown market ID! Dumping...")
+                if console_log:
+                    print("Received a request with unknown market ID! Dumping...")
 
             check_main(main_to_all=main_to_all)
 
@@ -149,7 +150,8 @@ def process_requests(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue):
                     scraper_to_hub.put(obj=products[:5000], block=False)
                     break
                 else:
-                    print("Pipe not ready for writing. Retrying...")
+                    if console_log:
+                        print("Pipe not ready for writing. Retrying...")
                     check_main(main_to_all=main_to_all, timeout=0.05)
                 
             products = products[5000:]
@@ -161,7 +163,8 @@ def process_requests(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue):
                     scraper_to_hub.put(processed_request.ID, block=False)
                     break
                 else:
-                    print("Pipe not ready for writing. Retrying...")
+                    if console_log:
+                        print("Pipe not ready for writing. Retrying...")
                     check_main(main_to_all=main_to_all, timeout=0.05)
 
 
@@ -169,7 +172,7 @@ def process_requests(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue):
 
 
 
-def start(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue, hub_to_scraper: mpr.Queue):
+def start(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue, hub_to_scraper: mpr.Queue, console_log: bool = True):
     
     signal.signal(signal.SIGINT, signal_handler)
     os.chdir(parent_directory)
@@ -180,10 +183,10 @@ def start(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue, hub_to_scraper: mpr
     check_main(main_to_all=main_to_all)
 
     # here we initialize a scraper for each market availale in the market hub
-    with MarketHub(src_file=MARKET_HUB_FILE['path']) as hub:
+    with MarketPlace(src_file=MARKET_CENTER_FILE['path'], console_log=console_log) as hub:
 
         for market in hub.markets():
-            scrapers.append(ProductScraper(market=market))
+            scrapers.append(ProductScraper(market=market, console_log=console_log))
 
         # now we can check for incoming requests and process them afterwards
         # the process also checks for incoming signal from the main process
@@ -193,8 +196,8 @@ def start(main_to_all: mpr.Queue, scraper_to_hub: mpr.Queue, hub_to_scraper: mpr
 
         while True:
 
-            __check_market_hub(hub_to_scraper=hub_to_scraper)
-            process_requests(main_to_all=main_to_all, scraper_to_hub=scraper_to_hub)
+            __check_market_hub(hub_to_scraper=hub_to_scraper, console_log=console_log)
+            process_requests(main_to_all=main_to_all, scraper_to_hub=scraper_to_hub, console_log=console_log)
             check_main(main_to_all=main_to_all)
 
             time.sleep(1)
