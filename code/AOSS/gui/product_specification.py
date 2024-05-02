@@ -420,6 +420,10 @@ class ProductSpecificationMenu(LabelFrame):
             messagebox.showerror("Product Specification", "Name field cannot be empty!")
             return
 
+        if not self.shopping_list_f.can_insert(name=name):
+            messagebox.showerror(title="Product Specification", message="List already contains a product with the same name!")
+            return
+
         
 
         category = self.categories_menu.buttons_panel.get_option()

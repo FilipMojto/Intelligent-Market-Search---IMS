@@ -314,15 +314,15 @@ class MarketExplorer:
         expl_2  = None
 
         for expl in exploration_list:
-            if expl.product_data[product_index][1].name == expl_2_name:
+            if expl.product_data[product_index - 1][1].name == expl_2_name:
                 expl_2 = expl
                 break
         else:
             raise ValueError("Product name not found!")
         
 
-        expl_1_product_data = expl_1.product_data[product_index]
-        expl_2_product_data = expl_2.product_data[product_index]
+        expl_1_product_data = expl_1.product_data[product_index - 1]
+        expl_2_product_data = expl_2.product_data[product_index - 1]
 
         expl_1.replace_product(replacement=expl_2_product_data)
         expl_2.replace_product(replacement=expl_1_product_data)
@@ -375,9 +375,9 @@ class MarketExplorer:
                                         match_ratio=match_record[i].ratio,
                                         quantity=params.required_quantity)
                     
-                if alternative_count == 0:
+                for i in range(alternative_count, self.__alternatives):
                     # no products were found
-                    self.__explorations[market_index][0].insert_product(target_ID=params.target_id,
+                    self.__explorations[market_index][i].insert_product(target_ID=params.target_id,
                                         product=None,
                                         match_ratio=-1,
                                         quantity=params.required_quantity)

@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import ttk
+from tkinter import messagebox
 
 from typing import List, Literal
 
@@ -18,7 +19,7 @@ from AOSS.structure.shopping import ProductCategory, ProductWeightUnit
 
 # --- ShoppingListItem - Class Declaration&Definition --- #
 
-class ShoppingListDetails(LabelFrame):
+class ShoppingItemDetails(LabelFrame):
     
     """
         This class represents a single product item in the user's shopping list.
@@ -35,7 +36,7 @@ class ShoppingListDetails(LabelFrame):
                   ID: int,
                   language: Literal['EN', 'SK'] = 'EN',
                   category_search_mode: str, on_widget_click: callable = None, **kw):
-        super(ShoppingListDetails, self).__init__(*args, **kw)
+        super(ShoppingItemDetails, self).__init__(*args, **kw)
 
         self.language = language
         self.cur_labels = self.LABELS_EN if self.language == 'EN' else self.LABELS_SK
@@ -76,13 +77,13 @@ class ShoppingListDetails(LabelFrame):
 
         self.weight_unit = weight_unit
         self.weight_unit_text = StringVar()
-        self.weight_unit_text.set(f"{self.cur_labels[3]} {self.weight_unit.name}")
+        self.weight_unit_text.set(f"{self.cur_labels[3]} {self.weight_unit.name if self.weight_unit.name != 'NONE' else '---'}")
 
 
 
         self.weight = weight
         self.weight_text = DoubleVar()
-        self.weight_text.set(f"{self.cur_labels[4]} {weight}")
+        self.weight_text.set(f"{self.cur_labels[4]} {weight if weight != -1 else '---'}")
 
 
         
@@ -130,6 +131,8 @@ class ShoppingListDetails(LabelFrame):
         self.ID_label.grid(row=3, column=0, sticky="NSEW")
         self.ID_label.bind("<Button-1>", on_widget_click)
 
+        self.target_ID = None
+
         if callable:
             self.name_label.bind("<Button-1>", on_widget_click)
             self.category_label.bind("<Button-1>", on_widget_click)
@@ -150,7 +153,7 @@ class ShoppingListItem(Frame):
                   ID: int, on_widget_click: callable = None, language: Literal['EN', 'SK'] = 'EN', **kw):
         super(ShoppingListItem, self).__init__(*args, **kw)
 
-        self.details = ShoppingListDetails(self,  name=name,
+        self.details = ShoppingItemDetails(self,  name=name,
                                            category_search_mode=category_search_mode, category=category,
                                            amount=amount,
                                            weight_unit=weight_unit, weight=weight,
@@ -204,7 +207,11 @@ class ShoppingList(Frame):
                     return item
                 else:
                     break
+                    
+        for index, item in enumerate(self.items):
+            item.details.ID_text.set(str(index + 1))
         
+        self.__ID = len(self.items) + 1
 
 
 
@@ -303,6 +310,10 @@ class ShoppingListFrame(LabelFrame):
         self.scrollbar.update()
 
 
+    def can_insert(self, name: str):
+
+
+        return all(item.details.name != name for item in self.product_list.items)
 
     def insert_item(self, name: str, category: int, amount: int, category_search_mode: str,
                     weight_unit: ProductWeightUnit, weight: float):
@@ -314,8 +325,15 @@ class ShoppingListFrame(LabelFrame):
             placed vertically representing a shopping list.
 
             Newly created instance is returned immediatelly.
+
+            New product must have unique name, otherwise insertion fails.
         
         """
+
+        for item in self.product_list.items:
+            if item.details.name == name:
+                messagebox.showerror(title="Product Specification", message="List already contains a product with the same name!")
+                return
 
         item = ShoppingListItem(self.product_list,
                                 name=name,

@@ -51,10 +51,11 @@ class ProductCategory(Enum):
     SLADKOSTI = 7
     SLANE_SNACKY_SEMIENKA = 8
     NEALKOHOLICKE_NAPOJE = 9
-    TEPLE_NAPOJE = 10
-    ALKOHOL = 11
-    ZDRAVE_POTRAVINY = 12
-    HOTOVE_INSTANTNE = 13
+    ALKOHOL = 10
+    TEPLE_NAPOJE = 11
+    HOTOVE_INSTANTNE = 12
+    ZDRAVE_POTRAVINY = 13
+    
 
 class ProductWeightUnit(Enum):
     NONE = 1

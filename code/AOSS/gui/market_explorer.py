@@ -268,8 +268,10 @@ class MarketExplorerFrame(LabelFrame):
         self.market_explorer = MarketExplorer(market_place=market_hub, alternatives=5)
 
         self.product_items = shopping_list_frame.product_list.items
+        # self.product_target_mappings: Dict[str, int] = {}
         # self.product_items: List[ShoppingListItem] = []
         self.explorations: List[List[MarketExplorer.Exploration]] = []
+    
 
         # ---- Frame Configuration ---- #
 
@@ -331,8 +333,8 @@ class MarketExplorerFrame(LabelFrame):
             return
         
     
-        if not self.shopping_list.product_list.items:
-            self.search_button.config(state='disabled')
+        # if not self.shopping_list.product_list.items:
+        #     self.search_button.config(state='disabled')
 
 
         self.market_explorer.remove_target(ID=item.details.ID)
@@ -417,7 +419,7 @@ class MarketExplorerFrame(LabelFrame):
                 prod_data = None
 
                 for data in expl.product_data:
-                    if data[0] == target_ID + 1:
+                    if data[0] == target_ID:
                         prod_data = data
 
 
@@ -578,17 +580,24 @@ class MarketExplorerFrame(LabelFrame):
                 self.explorer_view.table.insert_value(row=3, col=i + 1, value=self.decline_icon)
 
     def explore_product(self, item: ShoppingListItem):
-
-
+        """
+            New product is prepared for exploration. It receives specification based on the user input
+            stored in the provided ShoppingItemDetails instance. It is also assigned a unique target identifier.
+        """
+        product_name = TextEditor.standardize_str(item.details.name)
         category = None if item.details.category == 0 else ProductCategory(value=item.details.category)
-        item_data = [MarketExplorer.ExplorationParams(target_id=item.details.ID,
-                                                      product_name=TextEditor.standardize_str(item.details.name),
+        item_data = [MarketExplorer.ExplorationParams(target_id=self.next_target_ID,
+                                                      product_name=product_name,
                                                       product_category=category,
                                                       required_quantity=item.details.amount,
                                                       categorization=item.details.category_search_mode,
                                                       weight_unit=item.details.weight_unit,
                                                       weight=item.details.weight)]
+        item.details.target_ID = self.next_target_ID
+        
+        
 
+        self.next_target_ID += 1
         
         self.market_explorer.explore(product_list=item_data)
 
@@ -607,22 +616,22 @@ class MarketExplorerFrame(LabelFrame):
 
         return False
 
-    def is_bound_2(self, widget):
-        existing_bindings = widget.bind("<Button-1>")
-        if existing_bindings and str(existing_bindings) == str(widget.bind(on_button_click)):
-            print("Event is already bound to the function")
-        else:
-            # Bind the event to the function
-            root.bind("<Button-1>", on_button_click)
-            print("Event bound to the function")
+    # def is_bound_2(self, widget):
+    #     existing_bindings = widget.bind("<Button-1>")
+    #     if existing_bindings and str(existing_bindings) == str(widget.bind(on_button_click)):
+    #         print("Event is already bound to the function")
+    #     else:
+    #         # Bind the event to the function
+    #         root.bind("<Button-1>", on_button_click)
+    #         print("Event bound to the function")
 
     def search_markets(self):
         self.search_executed = True
         
         for item in self.product_items:
-            if not self.is_bound(widget=item, event='<Button-1>'):
-                bind_widgets_recursive(widget=item, event="<Button-1>", handler=self.create_handler(index=self.next_target_ID, item=item))
-                self.next_target_ID += 1
+            # if not self.is_bound(widget=item, event='<Button-1>'):
+            bind_widgets_recursive(widget=item, event="<Button-1>", handler=self.create_handler(index=item.details.target_ID, item=item))
+            # self.next_target_ID += 1
 
 
         self.explorations = self.market_explorer.get_explorations()

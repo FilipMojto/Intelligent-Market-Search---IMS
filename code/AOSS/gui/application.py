@@ -36,14 +36,16 @@ class Application(tkinter.Tk):
     MAIN_MENU_ITEMS_EN = ('Shopping List', 'Market Explorer', 'Settings', 'Exit')
     MAIN_MENU_ITEMS_SK = ('Nákupný zoznam', 'Hľadanie obchodov', 'Nastavenia', 'Odísť')
     
-    def bind_children(self, widget, event, handler):
-        print("BINDING")
-        # Bind the event to the current widget
-        widget.bind(event, handler)
+    # DO NOT REMOVE THIS, THERE IS AN IDEA BUT NOT YET FUNCTIONAL
+
+    # def bind_children(self, widget, event, handler):
+    #     # print("BINDING")
+    #     # Bind the event to the current widget
+    #     widget.bind(event, handler)
         
-        # Recursively bind the event to all children widgets
-        for child in widget.winfo_children():
-            self.bind_children(child, event, handler)
+    #     # Recursively bind the event to all children widgets
+    #     for child in widget.winfo_children():
+    #         self.bind_children(child, event, handler)
 
             
     def __init__(self, *args, lock: mpr.Lock = None, gui_to_hub: mpr.Queue = None,
@@ -82,7 +84,7 @@ class Application(tkinter.Tk):
         
         self.bind("<Key>", lambda event, main_view=self.main_view: main_view.on_key_press(event, main_view))
 
-        self.bind_children(self, "<<Button-1>>", self.on_click)
+        # self.bind_children(self, "<<Button-1>>", self.on_click)
     
     def on_click(self):
         print("CLICKED!")

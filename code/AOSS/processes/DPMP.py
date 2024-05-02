@@ -250,7 +250,7 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
 
     for market in markets:
         if market.ID() == training_market.ID(): continue
-        request_missing_categories(market=market)
+        request_missing_categories(market=market, console_log=console_log)
 
     send_progress_signal(hub_to_gui=hub_to_gui, main_to_all=main_to_all, progress=PRP.SCRAPING_MISSING_DATA,
                          console_log=console_log)
@@ -292,9 +292,11 @@ def start(main_to_all: mpr.Queue, hub_to_scraper: mpr.Queue, scraper_to_hub: mpr
                         
                         try:
                             market.register_product(product=product, norm_category=category)
-                            print(f"Registered successfully: {{{product.name}}}")
+                            if console_log:
+                                print(f"Registered successfully: {{{product.name}}}")
                         except IllegalProductState:
-                            print(f"Product {{{product.name}}} already registered!")
+                            if console_log:
+                                print(f"Product {{{product.name}}} already registered!")
                             
               
 

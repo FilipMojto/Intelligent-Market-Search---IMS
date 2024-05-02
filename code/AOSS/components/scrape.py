@@ -27,6 +27,7 @@ from AOSS.structure.shopping import Market, Product, ProductWeightUnit
 
 #from AOSS.other.utils import ThreadPool
 from AOSS.structure.shopping import Market
+from AOSS.components.processing import extract_weight_data
 #from AOSS.other.exceptions import InvalidHTMLFormat
 
 # ------ ProductScraper - Class Declaration&Definition ------ #
@@ -388,7 +389,6 @@ class ProductScraper:
         return self.__market
 
 
-
     def scrape_categories(self, identifiers: tuple[int, ...], mode: Literal['ID', 'index'] = 'ID', products: List[tuple[Product, int]] = None,
                           console_log: bool = None):
         
@@ -460,109 +460,74 @@ class ProductScraper:
                 if quantity_left is None:
                     quantity_left = 0
                 
+                weight_unit, weight_value = extract_weight_data(item=item)
   
-                weight_unit = "unknown"
-                weight_value: float = -1
+                # weight_unit = "unknown"
+                # weight_value: float = -1
 
-                name = item.get('name')
-                name_splits: List = name.split(" ")
+                # name = item.get('name')
+                # name_splits: List = name.split(" ")
 
-                if item['id'] == '63be747b1cbfb298235d56a9' or item['id'] == '64afa2cc054021ac79bc0341':
-                    pass
+                # if item['id'] == '63be747b1cbfb298235d56a9' or item['id'] == '64afa2cc054021ac79bc0341':
+                #     pass
 
-                try:
-                    weight_unit = name_splits[len(name_splits) - 1]
-                    weight_value = float(name_splits[len(name_splits) - 2].replace(",", "."))               
-                except ValueError:
-                    last: str = name_splits[len(name_splits) - 1]
-                    i = 0
+                # try:
+                #     weight_unit = name_splits[len(name_splits) - 1]
+                #     weight_value = float(name_splits[len(name_splits) - 2].replace(",", "."))               
+                # except ValueError:
+                #     last: str = name_splits[len(name_splits) - 1]
+                #     i = 0
 
-                    for i in range(len(last)):
-                        if not last[i].isdigit():
-                            break
-                    
-                    try:
-                        weight_value = float(last[: i].replace(",", "."))
-                        weight_unit = last[i:]
-
-                        if weight_unit not in ['l', 'L', 'ml', 'g', 'kg', 'ks']:
-                            raise ValueError
-                        
-                    except ValueError:
-                        
-                        
-                        try:
-                            weight_value = float(name_splits[len(name_splits) - 2][1:].replace(",", "."))
-                            weight_unit = name_splits[len(name_splits) - 1][:-1]
-                        except ValueError:
-                            try:
-                                last_splits = last.split("x")
-                                first = int(last_splits[0])
-
-                                i = 0
-
-                                for i in range(len(last_splits[1])):
-                                    if not last_splits[1][i].isdigit():
-                                        break
-            
-                                weight_value = first * float(last_splits[1][: i].replace(",", "."))
-                                weight_unit = last_splits[1][i:]
-                            except ValueError:
-                                pass
-
-            
-
-
-
-                # if description != "":
-                #     split_index = -1
-
-                #     for index, char in enumerate(description):
-                #         if char == "\n":
-                #             split_index = index
+                #     for i in range(len(last)):
+                #         if not last[i].isdigit():
                 #             break
                     
-                #     if split_index != -1:
-                #         description = description[split_index + 1:]
+                #     try:
+                #         weight_value = float(last[: i].replace(",", "."))
+                #         weight_unit = last[i:]
 
+                #         if weight_unit not in ['l', 'L', 'ml', 'g', 'kg', 'ks']:
+                #             raise ValueError
                         
-
-                #     first_comma_encountered = False
-
-                #     for index, char in enumerate(description):
-                #         if not first_comma_encountered and char == ',' and description[index + 1].isdigit():
-                #             modified_description += '.'
-                #             first_comma_encountered = True
-                #         else:
-                #             modified_description += char
+                #     except ValueError:
                         
-                #     weight_attr = description.split(",")[0].split(" ")
+                        
+                #         try:
+                #             weight_value = float(name_splits[len(name_splits) - 2][1:].replace(",", "."))
+                #             weight_unit = name_splits[len(name_splits) - 1][:-1]
+                #         except ValueError:
+                #             try:
+                #                 last_splits = last.split("x")
+                #                 first = int(last_splits[0])
 
-                #     weight_value = float(weight_attr[0])
-                #     weight_unit = weight_attr[1]
-                
-                if weight_unit == "l" or weight_unit == "L":
-                    weight_unit = ProductWeightUnit.LITRES #"litre"
-                elif weight_unit == "ml":
-                    weight_value /= 1000
-                    weight_unit = ProductWeightUnit.LITRES #"litre"
-                elif weight_unit == "g":
-                    weight_unit = ProductWeightUnit.GRAMS #"gram"
-                elif weight_unit == "kg":
-                    weight_value /= 1000
-                    weight_unit = ProductWeightUnit.GRAMS #"gram"
-                elif weight_unit == "ks":
-                    weight_unit = ProductWeightUnit.NONE
-                    pass
-                else:
-                    weight_unit = ProductWeightUnit.NONE
-         
-                    pass
+                #                 i = 0
+
+                #                 for i in range(len(last_splits[1])):
+                #                     if not last_splits[1][i].isdigit():
+                #                         break
             
+                #                 weight_value = first * float(last_splits[1][: i].replace(",", "."))
+                #                 weight_unit = last_splits[1][i:]
+                #             except ValueError:
+                #                 pass
 
-
-
-
+            
+                
+                # if weight_unit == "l" or weight_unit == "L":
+                #     weight_unit = ProductWeightUnit.LITRES 
+                # elif weight_unit == "ml":
+                #     weight_value /= 1000
+                #     weight_unit = ProductWeightUnit.LITRES
+                # elif weight_unit == "g":
+                #     weight_value /= 1000
+                #     weight_unit = ProductWeightUnit.GRAMS
+                # elif weight_unit == "kg":
+                #     weight_unit = ProductWeightUnit.GRAMS 
+                # elif weight_unit == "ks":
+                #     weight_unit = ProductWeightUnit.NONE
+                # else:
+                #     weight_unit = ProductWeightUnit.NONE
+            
 
                 new_product = Product(
                     name=item.get('name', 'unknown'),
@@ -598,8 +563,6 @@ class ProductScraper:
             _return = True
             products = []
         
-
-       # url = self.__url + ProductScraper._MARKET_CATEGORY_URL + category_name
         response = requests.get(self.__url)
 
         if response.status_code == 200:
@@ -630,11 +593,15 @@ class ProductScraper:
                 if quantity_left is None:
                     quantity_left = 0
 
+                weight_unit, weight_value = extract_weight_data(item=item)
+
                 new_product = Product(
                     name=item.get('name', 'unknown'),
                     price=int(item.get('baseprice', -1)) / 100,
                     approximation=0,
                     quantity_left=quantity_left,
+                    weight_unit=weight_unit,
+                    weight=weight_value,
                     category_ID=category_ID,
                     created_at=datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'),
                     updated_at=datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S'))
@@ -650,17 +617,6 @@ class ProductScraper:
         if _return:
             return products
         
-        #return self.scrape_categories(categories=self.__market.categories(), console_log=console_log)
-        # products: List[tuple[Product, int]] = []
-
-        # self.scrape_categories(categories=self.__market.categories(), products=products, console_log=console_log)
-
-        # # for category in categories:
-        # #     self.scrape_categories(categories=(category,), products=products, console_log=console_log)
-
-        # return products
-        #return Scraper.__scrape_products(url=self.__url)
-
 
     
 
